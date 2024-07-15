@@ -18,6 +18,7 @@ use DateTime;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -48,22 +49,16 @@ class MenuController extends AbstractController
         
     }
 
-    #[Route("/", name: "create", methods: ["POST"])]    
+    #[Route("/", name: "new", methods: ["POST"])]    
     /**
      * Create
      *
      * @return Response
      */
-    public function create(): Response
+    public function new(): Response
     {
-        $restaurant = $this->restaurantRepository->findOneBy(["id" => 2]);
+        
         $menu = new Menu();
-        $menu->setRestaurant($restaurant);
-        $menu->setUuid(uniqid());
-        $menu->setTitle("Menu de test de l'api du restaurant");
-        $menu->setDescription("Venez découvrir des mets authentique pleins de lignes de codes...");
-        $menu->setPrice(35);
-        $menu->setCreatedAt(new DateTimeImmutable());
 
         $this->manager->persist($menu);
         $this->manager->flush();
@@ -86,11 +81,18 @@ class MenuController extends AbstractController
     {
         $menu = $this->menuRepository->findOneBy(["id" => $id]);
 
-        return $this->json(
-            [
-            "message" => "Menu was found with uuid : {$menu->getUuid()}"
-            ]
-        );
+        if($menu){
+
+            return $this->json(
+                [
+                "message" => "Menu was found with uuid : {$menu->getUuid()}"
+                ]
+            );
+
+        }
+
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
+
     }
 
     #[Route("/{id}", name: "edit", methods: ["PUT"], requirements: ["id" => "\d+"])]    
@@ -103,14 +105,19 @@ class MenuController extends AbstractController
     public function edit(int $id): Response
     {
         $menu = $this->menuRepository->findOneBy(["id" => $id]);
-        $menu->setTitle("Title menu modified");
-        $menu->setUpdatedAt(new DateTime());
 
-        return $this->json(
-            [
-            "message" => "Menu was modifier with uuid : {$menu->getUuid()}, new name : {$menu->getTitle()} at {$menu->getUpdatedAt()->format('Y-m-d H:i:s')}"
-            ]
-        );
+        if($menu){
+            $menu->setUpdatedAt(new DateTime());
+
+            return $this->json(
+                [
+                "message" => "Menu was modifier with uuid : {$menu->getUuid()}, new name : {$menu->getTitle()} at {$menu->getUpdatedAt()->format('Y-m-d H:i:s')}"
+                ]
+            );
+        }
+
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
+
     }
 
     #[Route("/{id}", name: "delete", methods: ["DELETE"], requirements: ["id" => "\d+"])]    
@@ -123,14 +130,19 @@ class MenuController extends AbstractController
     public function delete(int $id): Response
     {
         $menu = $this->menuRepository->findOneBy(["id" => $id]);
-        
-        $this->manager->remove($menu);
-        $this->manager->flush();
 
-        return $this->json(
-            [
-            "message" => "Menu with uuid {$menu->getUuid()} was deleted."
-            ]
-        );
+        if($menu){
+            $this->manager->remove($menu);
+            $this->manager->flush();
+    
+            return $this->json(
+                [
+                "message" => "Menu with uuid {$menu->getUuid()} was deleted."
+                ]
+            );
+        }
+        
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
+
     }
 }

@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('api/food', name: 'api_app_food_')]
@@ -19,20 +20,25 @@ class FoodController extends AbstractController
     {
         
     }
+
     #[Route("/{id}", name: "show", requirements: ["id" => "\d+"], methods: ["GET"])]
     public function show(Request $request, int $id): JsonResponse
     {
 
         $food = $this->foodRepository->findOneBy(["id" => $id]);
 
+        if ($food) {
+            return $this->json([
+                "message" => "Food was found with uuid {$food->getUuid()}"
+            ]);
+        }
 
-        return $this->json([
-            "message" => "Food was found with uuid {$food->getUuid()}"
-        ]);
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
+
     }
 
-    #[Route("/", name: "create", methods: "POST")]
-    public function create(Request $request): JsonResponse
+    #[Route("/", name: "new", methods: "POST")]
+    public function new(Request $request): JsonResponse
     {
 
         $food = new Food();
@@ -55,16 +61,20 @@ class FoodController extends AbstractController
     {
 
         $food = $this->foodRepository->findOneBy(["id" => $id]);
+
+
+        if ($food) {
+            $food->setUpdatedAt(new DateTimeImmutable());
+
+            $this->manager->flush();
+    
+            return $this->json([
+                "message" => "Food was updated with uuid : {$food->getUuid()}"
+            ]);
+        }
+
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
         
-        $food->setTitle("Food numero 1 with updated title");
-        $food->setPrice(15);
-        $food->setUpdatedAt(new DateTimeImmutable());
-
-        $this->manager->flush();
-
-        return $this->json([
-            "message" => "Food was updated with uuid : {$food->getUuid()}"
-        ]);
     }
 
     #[Route("/{id}", name: "delete", requirements: ["id" => "\d+"], methods: "DELETE")]
@@ -73,13 +83,17 @@ class FoodController extends AbstractController
 
         $food = $this->foodRepository->findOneBy(["id" => $id]);
         
-        
+        if ($food) {
+            $this->manager->remove($food);
+            $this->manager->flush();
+    
+            return $this->json([
+                "message" => "Food with uuid : {$food->getUuid()} was deleted succefully"
+            ]);
+    
+        }
 
-        $this->manager->remove($food);
-        $this->manager->flush();
+        return new JsonResponse(null, Response::HTTP_NOT_FOUND);
 
-        return $this->json([
-            "message" => "Food with uuid : {$food->getUuid()} was deleted succefully"
-        ]);
     }
 }
