@@ -17,11 +17,15 @@ use App\Repository\RestaurantRepository;
 use DateTime;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Rfc4122\UuidV4;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route("api/menu", name: "api_app_menu_")]
 /**
@@ -43,31 +47,14 @@ class MenuController extends AbstractController
      * @param mixed $manager
      * @param mixed $restaurantRepository
      */
-    public function __construct(private EntityManagerInterface $manager, private RestaurantRepository $restaurantRepository, 
-        private MenuRepository $menuRepository
+    public function __construct(
+        private EntityManagerInterface $manager, 
+        private RestaurantRepository $restaurantRepository, 
+        private MenuRepository $menuRepository,
+        private SerializerInterface $serializer,
+        private UrlGeneratorInterface $urlGenerator
     ) {
         
-    }
-
-    #[Route("/", name: "new", methods: ["POST"])]    
-    /**
-     * Create
-     *
-     * @return Response
-     */
-    public function new(): Response
-    {
-        
-        $menu = new Menu();
-
-        $this->manager->persist($menu);
-        $this->manager->flush();
-
-        return $this->json(
-            [
-            "message" => "Menu was created with uuid : {$menu->getUuid()}"
-            ]
-        );
     }
 
     #[Route("/{id}", name: "show", methods: ["GET"], requirements: ["id" => "\d+"])]    
@@ -75,19 +62,17 @@ class MenuController extends AbstractController
      * Show
      *
      * @param  mixed $id
-     * @return Response
+     * @return JsonResponse
      */
-    public function show(int $id): Response
+    public function show(int $id): JsonResponse
     {
         $menu = $this->menuRepository->findOneBy(["id" => $id]);
 
         if($menu){
 
-            return $this->json(
-                [
-                "message" => "Menu was found with uuid : {$menu->getUuid()}"
-                ]
-            );
+            $responseData = $this->serializer->serialize($menu, 'json');
+
+            return new JsonResponse($responseData, Response::HTTP_OK, [], true);
 
         }
 
@@ -95,25 +80,70 @@ class MenuController extends AbstractController
 
     }
 
+    #[Route("/", name: "new", methods: ["POST"])]    
+    /**
+     * Create and redirect to show route
+     *
+     * @return JsonResponse
+     */
+    public function new(Request $request): JsonResponse
+    {
+        
+        $menu = $this->serializer->deserialize($request->getContent(), Menu::class, 'json');
+
+        $menu->setCreatedAt(new DateTimeImmutable());
+        $menu->setUuid(UuidV4::uuid4());
+
+        $this->manager->persist($menu);
+        $this->manager->flush();
+
+        $responseData = $this->serializer->serialize($menu, 'json');
+        $location = $this->urlGenerator->generate(
+            'api_app_menu_show',
+            ['id' => $menu->getId()],
+            UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
+        return new JsonResponse($responseData, Response::HTTP_CREATED, ['location' => $location], true);
+    }
+
+
+
     #[Route("/{id}", name: "edit", methods: ["PUT"], requirements: ["id" => "\d+"])]    
     /**
-     * Edit
+     * Edit and redirect to shown route
      *
      * @param  mixed $id
      * @return Response
      */
-    public function edit(int $id): Response
+    public function edit(Request $request, int $id): Response
     {
         $menu = $this->menuRepository->findOneBy(["id" => $id]);
 
         if($menu){
+            $menu = $this->serializer->deserialize(
+                $request->getContent(),
+                Menu::class,
+                'json',
+                [
+                    AbstractNormalizer::OBJECT_TO_POPULATE => $menu
+                ]
+                );
             $menu->setUpdatedAt(new DateTime());
 
-            return $this->json(
+            $this->manager->flush();
+
+            $responseData = $this->serializer->serialize($menu, 'json');
+            $location = $this->urlGenerator->generate(
+                'api_app_menu_show',
                 [
-                "message" => "Menu was modifier with uuid : {$menu->getUuid()}, new name : {$menu->getTitle()} at {$menu->getUpdatedAt()->format('Y-m-d H:i:s')}"
-                ]
+                    'id' => $menu->getId()
+                ],
+                UrlGeneratorInterface::ABSOLUTE_URL
             );
+
+            return new JsonResponse($responseData, Response::HTTP_CREATED, ['location' => $location], true);
+            
         }
 
         return new JsonResponse(null, Response::HTTP_NOT_FOUND);
@@ -135,11 +165,7 @@ class MenuController extends AbstractController
             $this->manager->remove($menu);
             $this->manager->flush();
     
-            return $this->json(
-                [
-                "message" => "Menu with uuid {$menu->getUuid()} was deleted."
-                ]
-            );
+            return new JsonResponse(null, Response::HTTP_NO_CONTENT);
         }
         
         return new JsonResponse(null, Response::HTTP_NOT_FOUND);

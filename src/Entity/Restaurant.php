@@ -60,7 +60,7 @@ class Restaurant
      * @var Collection<int, Menu>
      */
     #[ORM\OneToMany(targetEntity: Menu::class, mappedBy: 'restaurant', orphanRemoval: true)]
-    private Collection $menus;
+    private ?Collection $menus = null;
 
     public function __construct()
     {

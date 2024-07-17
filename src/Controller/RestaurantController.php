@@ -116,13 +116,7 @@ class RestaurantController extends AbstractController {
             $this->manager->remove($restaurant);
             $this->manager->flush();
     
-            return $this->json(
-                [
-                    "message" =>    `The restaurant {$restaurant->getName()} 
-                                    with id : {$restaurant->getId()} was succefully deleted.`
-                ],
-                status: Response::HTTP_NO_CONTENT
-            );;
+            return new JsonResponse(null, Response::HTTP_NO_CONTENT);
 
         }
 

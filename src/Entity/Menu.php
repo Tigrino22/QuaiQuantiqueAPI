@@ -35,7 +35,7 @@ class Menu
     private ?\DateTime $updatedAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'menus')]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     private ?Restaurant $restaurant = null;
 
     /**
